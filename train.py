@@ -40,6 +40,23 @@ try:
 except:
     SPARSE_ADAM_AVAILABLE = False
 
+_TB_HISTOGRAM_WARNING_EMITTED = False
+
+
+def add_histogram_safe(tb_writer, tag, values, iteration):
+    global _TB_HISTOGRAM_WARNING_EMITTED
+
+    if tb_writer is None:
+        return
+
+    try:
+        histogram_values = values.detach().float().reshape(-1).cpu()
+        tb_writer.add_histogram(tag, histogram_values, iteration)
+    except Exception as exc:
+        if not _TB_HISTOGRAM_WARNING_EMITTED:
+            print(f"TensorBoard histogram logging disabled: {exc}")
+            _TB_HISTOGRAM_WARNING_EMITTED = True
+
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
 
     if not SPARSE_ADAM_AVAILABLE and opt.optimizer_type == "sparse_adam":
@@ -247,7 +264,7 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
 
         if tb_writer:
-            tb_writer.add_histogram("scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
+            add_histogram_safe(tb_writer, "scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
             tb_writer.add_scalar('total_points', scene.gaussians.get_xyz.shape[0], iteration)
         torch.cuda.empty_cache()
 
