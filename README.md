@@ -102,9 +102,11 @@ Our default, provided install method is based on Conda package and environment m
 ```shell
 SET DISTUTILS_USE_SDK=1 # Windows only
 conda env create --file environment.yml
-conda activate gaussian_splatting
+conda activate gaussian-splatting
 ```
 Please note that this process assumes that you have CUDA SDK **11** installed, not **12**. For modifications, see below.
+
+For this repository state, we have also validated a local setup using **Python 3.9**, **PyTorch 1.12.1**, **cudatoolkit 11.6** and the `gaussian-splatting` Conda environment name from `environment.yml`. TensorBoard logging is enabled by installing `tensorboard` and `six` into the same environment.
 
 Tip: Downloading packages and creating a new environment with Conda can require a significant amount of disk space. By default, Conda will use the main system hard drive. You can avoid this by specifying a different package download location and an environment on a different drive:
 
@@ -505,10 +507,30 @@ git checkout 3dgs_accel
 pip install .
 ```
 
+In this repository, `SparseGaussianAdam` is only available after switching `submodules/diff-gaussian-rasterization` from the default `main` lineage to the accelerated `3dgs_accel` branch and rebuilding the extension. A validated configuration is:
+
+```bash
+conda activate gaussian-splatting
+pip uninstall diff-gaussian-rasterization -y
+cd submodules/diff-gaussian-rasterization
+rm -rf build diff_gaussian_rasterization/_C*.so
+git checkout origin/3dgs_accel
+pip install -e .
+python -c "import diff_gaussian_rasterization as dgr; print(hasattr(dgr, 'SparseGaussianAdam'))"
+```
+
+The final command should print `True`. If it prints `False`, you are still using the non-accelerated rasterizer.
+
 Then you can add the following parameter to use the sparse adam optimizer when running `train.py`:
 
 ```bash
 --optimizer_type sparse_adam
+```
+
+Example:
+
+```bash
+python train.py -s <dataset_path> -m <output_path> --optimizer_type sparse_adam --eval
 ```
 
 *Note that this custom rasterizer has a different behaviour than the original version, for more details on training times please see [stats for training times](results.md/#training-times-comparisons)*.
