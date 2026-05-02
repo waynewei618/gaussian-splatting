@@ -27,6 +27,12 @@ args = parser.parse_args()
 colmap_command = '"{}"'.format(args.colmap_executable) if len(args.colmap_executable) > 0 else "colmap"
 magick_command = '"{}"'.format(args.magick_executable) if len(args.magick_executable) > 0 else "magick"
 use_gpu = 1 if not args.no_gpu else 0
+image_path = os.path.join(args.source_path, "input")
+if not os.path.isdir(image_path):
+    image_path = os.path.join(args.source_path, "inputs")
+if not os.path.isdir(image_path):
+    logging.error(f"No image directory found. Expected '{args.source_path}/input' or '{args.source_path}/inputs'.")
+    exit(1)
 
 if not args.skip_matching:
     os.makedirs(args.source_path + "/distorted/sparse", exist_ok=True)
@@ -34,10 +40,10 @@ if not args.skip_matching:
     ## Feature extraction
     feat_extracton_cmd = colmap_command + " feature_extractor "\
         "--database_path " + args.source_path + "/distorted/database.db \
-        --image_path " + args.source_path + "/input \
+        --image_path " + image_path + " \
         --ImageReader.single_camera 1 \
         --ImageReader.camera_model " + args.camera + " \
-        --SiftExtraction.use_gpu " + str(use_gpu)
+        --FeatureExtraction.use_gpu " + str(use_gpu)
     exit_code = os.system(feat_extracton_cmd)
     if exit_code != 0:
         logging.error(f"Feature extraction failed with code {exit_code}. Exiting.")
@@ -46,7 +52,7 @@ if not args.skip_matching:
     ## Feature matching
     feat_matching_cmd = colmap_command + " exhaustive_matcher \
         --database_path " + args.source_path + "/distorted/database.db \
-        --SiftMatching.use_gpu " + str(use_gpu)
+        --FeatureMatching.use_gpu " + str(use_gpu)
     exit_code = os.system(feat_matching_cmd)
     if exit_code != 0:
         logging.error(f"Feature matching failed with code {exit_code}. Exiting.")
@@ -57,7 +63,7 @@ if not args.skip_matching:
     # decreasing it speeds up bundle adjustment steps.
     mapper_cmd = (colmap_command + " mapper \
         --database_path " + args.source_path + "/distorted/database.db \
-        --image_path "  + args.source_path + "/input \
+        --image_path "  + image_path + " \
         --output_path "  + args.source_path + "/distorted/sparse \
         --Mapper.ba_global_function_tolerance=0.000001")
     exit_code = os.system(mapper_cmd)
@@ -68,7 +74,7 @@ if not args.skip_matching:
 ### Image undistortion
 ## We need to undistort our images into ideal pinhole intrinsics.
 img_undist_cmd = (colmap_command + " image_undistorter \
-    --image_path " + args.source_path + "/input \
+    --image_path " + image_path + " \
     --input_path " + args.source_path + "/distorted/sparse/0 \
     --output_path " + args.source_path + "\
     --output_type COLMAP")
